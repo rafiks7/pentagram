@@ -50,11 +50,15 @@ export default function ImageGenerator() {
   const handleDelete = (index: number) => {
     // delete image
     const imageUrl = images[index];
-    deleteImage(imageUrl).then(() => {
-      const newImages = [...images];
-      newImages.splice(index, 1);
-      setImages(newImages);
-    });
+    if (!imageUrl) return;
+
+    if (user) {
+      deleteImage(imageUrl, user.id).then(() => {
+        const newImages = [...images];
+        newImages.splice(index, 1);
+        setImages(newImages);
+      });
+    }
   };
 
   useEffect(() => {
