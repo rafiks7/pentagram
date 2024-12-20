@@ -3,8 +3,8 @@
 import {
   S3Client,
   PutObjectCommand,
-  paginateListObjectsV2,
   ListObjectsCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { fromEnv } from "@aws-sdk/credential-provider-env";
 
@@ -56,5 +56,27 @@ export async function listImages() {
     return images;
   } catch (error) {
     console.error("Error while listing images:", error);
+  }
+}
+
+export async function deleteImage(imageUrl: string) {
+  console.log("Deleting image:", imageUrl);
+  const filename = imageUrl.split("/").pop();
+  if (!filename) {
+    console.error("Invalid image URL:", imageUrl);
+    return;
+  }
+  console.log("Filename:", filename);
+
+  const command = new DeleteObjectCommand({
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: filename,
+  });
+
+  try {
+    await client.send(command);
+    console.log("Image deleted successfully:", imageUrl);
+  } catch (error) {
+    console.error("Error while deleting image:", error);
   }
 }

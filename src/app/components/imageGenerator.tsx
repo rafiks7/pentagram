@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { generateImage } from "@/app/actions/generate-image";
-import { listImages } from "@/app/actions/s3-actions";
+import { listImages, deleteImage } from "@/app/actions/s3-actions";
 
 export default function ImageGenerator() {
   const [inputText, setInputText] = useState("");
@@ -21,8 +21,7 @@ export default function ImageGenerator() {
 
       if (result.success && result.imageUrl) {
         setImages([...images, result.imageUrl]);
-      }
-      else {
+      } else {
         alert("Failed to generate image");
       }
 
@@ -42,6 +41,16 @@ export default function ImageGenerator() {
     "col-span-1 row-span-1",
     "col-span-1 row-span-1",
   ];
+
+  const handleDelete = (index: number) => {
+    // delete image
+    const imageUrl = images[index];
+    deleteImage(imageUrl).then(() => {
+      const newImages = [...images];
+      newImages.splice(index, 1);
+      setImages(newImages);
+    });
+  };
 
   useEffect(() => {
     // fetch images from s3
@@ -67,13 +76,33 @@ export default function ImageGenerator() {
           {images.map((image, index) => (
             <div
               key={index}
-              className={`${gridClasses[index % gridClasses.length]} bg-gray-800 rounded-lg overflow-hidden`}
+              className={`${gridClasses[index % gridClasses.length]} bg-gray-800 rounded-lg overflow-hidden relative`}
             >
               <img
                 src={image}
                 alt={`Generated image ${index + 1}`}
                 className="w-full h-full object-cover"
               />
+              {/* Delete Button */}
+              <button
+                onClick={() => handleDelete(index)}
+                className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth="2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
             </div>
           ))}
           {isLoading && (
