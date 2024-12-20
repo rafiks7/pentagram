@@ -6,7 +6,7 @@ import { uploadImage } from "@/app/actions/s3-actions";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { text } = body;
+    const { text, userID } = body;
 
     const apiKey = request.headers.get("X-API-Key");
 
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     const filename = `${crypto.randomUUID()}-${text.slice(0, 10)}.jpeg`;
 
-    const publicUrl = await uploadImage(imageBuffer, filename);
+    const publicUrl = await uploadImage(imageBuffer, filename, userID);
 
     console.log("Uploading image to S3:", publicUrl);
 

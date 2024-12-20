@@ -1,6 +1,6 @@
 "use server";
 
-export async function generateImage(text: string) {
+export async function generateImage(text: string, userID: string) {
   try {
     const response = await fetch(`${process.env.API_ENDPOINT}`, {
       method: "POST",
@@ -8,7 +8,7 @@ export async function generateImage(text: string) {
         "Content-Type": "application/json",
         "X-API-Key": process.env.API_KEY || "",
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, userID }),
     });
 
     if (!response.ok) {

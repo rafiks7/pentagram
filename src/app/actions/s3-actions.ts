@@ -8,15 +8,16 @@ import {
 } from "@aws-sdk/client-s3";
 import { fromEnv } from "@aws-sdk/credential-provider-env";
 
+
 const client = new S3Client({
   region: process.env.AWS_REGION,
   credentials: fromEnv(),
 });
 
-export async function uploadImage(imageBuffer: ArrayBuffer, filename: string) {
+export async function uploadImage(imageBuffer: ArrayBuffer, filename: string, userID: string) {
   const command = new PutObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME,
-    Key: filename,
+    Key: `${userID}/${filename}`,
     Body: new Uint8Array(imageBuffer),
     ContentType: "image/jpeg",
   });
@@ -27,11 +28,11 @@ export async function uploadImage(imageBuffer: ArrayBuffer, filename: string) {
     console.error("Error while uploading image:", error);
   }
 
-  const publicUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${filename}`;
+  const publicUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${userID}/${filename}`;
   return publicUrl;
 }
 
-export async function listImages() {
+export async function listImages(userID: string) {
   // list images from s3
   const command = new ListObjectsCommand({
     Bucket: process.env.AWS_BUCKET_NAME,

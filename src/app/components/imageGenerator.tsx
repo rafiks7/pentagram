@@ -4,25 +4,30 @@ import { use, useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { generateImage } from "@/app/actions/generate-image";
 import { listImages, deleteImage } from "@/app/actions/s3-actions";
+import { useUser } from "@clerk/nextjs";
 
 export default function ImageGenerator() {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
 
+  const { user } = useUser();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const result = await generateImage(inputText);
+      if (user) {
+        const result = await generateImage(inputText, user.id);
 
-      console.log("Result:", result);
+        console.log("Result:", result);
 
-      if (result.success && result.imageUrl) {
-        setImages([...images, result.imageUrl]);
-      } else {
-        alert("Failed to generate image");
+        if (result.success && result.imageUrl) {
+          setImages([...images, result.imageUrl]);
+        } else {
+          alert("Failed to generate image");
+        }
       }
 
       setInputText("");
@@ -53,13 +58,18 @@ export default function ImageGenerator() {
   };
 
   useEffect(() => {
+    console.log("imges:", images);
+  }, [images]);
+
+  useEffect(() => {
     // fetch images from s3
-    listImages().then(images => {
+    if (!user) return;
+    listImages(user.id).then(images => {
       console.log("Images from s3:", images);
       if (!images) return;
       setImages(images);
     });
-  }, []);
+  }, [user]);
 
   return (
     <div className="min-h-screen flex flex-col justify-between p-8 bg-gray-900 text-gray-100">
@@ -84,25 +94,27 @@ export default function ImageGenerator() {
                 className="w-full h-full object-cover"
               />
               {/* Delete Button */}
-              <button
-                onClick={() => handleDelete(index)}
-                className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  strokeWidth="2"
+              {user?.id === images[index].split("/")[3] && (
+                <button
+                  onClick={() => handleDelete(index)}
+                  className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
           ))}
           {isLoading && (
