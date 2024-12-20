@@ -10,6 +10,9 @@ export default function ImageGenerator() {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
+  const [editingIndex, setEditingIndex] = useState(-1);
+  const [editText, setEditText] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
 
   const { user } = useUser();
 
@@ -61,9 +64,40 @@ export default function ImageGenerator() {
     }
   };
 
-  useEffect(() => {
-    console.log("imges:", images);
-  }, [images]);
+  const handleEdit = (index: any) => {
+    setEditingIndex(index);
+  };
+
+  const handleSaveEdit = () => {
+    // Logic to save the edit
+    const imageUrl = images[editingIndex];
+    if (!imageUrl) return;
+
+    setIsEditing(true);
+
+    if (user) {
+      generateImage(editText, user.id, imageUrl).then(result => {
+        if (result.success && result.imageUrl) {
+          console.log("Image updated successfully:", result.imageUrl);
+          const newImages = [...images];
+          newImages[editingIndex] = result.imageUrl;
+          console.log("New images:", newImages);
+          setImages(newImages);
+        } else {
+          alert("Failed to update image");
+        }
+      });
+    }
+
+    setEditingIndex(-1);
+    setIsEditing(false);
+    setEditText("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(-1);
+    setEditText("");
+  };
 
   useEffect(() => {
     // fetch images from s3
@@ -97,6 +131,29 @@ export default function ImageGenerator() {
                 alt={`Generated image ${index + 1}`}
                 className="w-full h-full object-cover"
               />
+
+              {/* Edit Button */}
+              {user?.id === images[index].split("/")[3] && (
+                <button
+                  onClick={() => handleEdit(index)} // Your edit function goes here
+                  className="absolute top-2 left-2 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16 4l4 4M4 16l4 4M4 4l16 16"
+                    />
+                  </svg>
+                </button>
+              )}
               {/* Delete Button */}
               {user?.id === images[index].split("/")[3] && (
                 <button
@@ -118,6 +175,32 @@ export default function ImageGenerator() {
                     />
                   </svg>
                 </button>
+              )}
+              {/* Conditionally render the text input if editing */}
+              {editingIndex === index && (
+                <div className="absolute bottom-2 left-2 right-2 bg-gray-900 p-2 rounded-lg shadow-lg">
+                  <input
+                    type="text"
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    className="w-full p-2 rounded-lg bg-gray-800 text-gray-100"
+                    placeholder="Enter a description..."
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handleSaveEdit}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           ))}

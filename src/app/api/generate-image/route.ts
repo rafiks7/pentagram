@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { uploadImage } from "@/app/actions/s3-actions";
-
+import { use } from "react";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { text, userID } = body;
+    const { text, userID, imageUrl } = body;
 
     const apiKey = request.headers.get("X-API-Key");
 
@@ -21,6 +21,9 @@ export async function POST(request: Request) {
 
     url.searchParams.set("prompt", text);
 
+    if (imageUrl != "") {
+      url.searchParams.set("imageUrl", imageUrl);
+    }
     console.log("Sending request to:", url.toString());
 
     const response = await fetch(url.toString(), {
@@ -40,14 +43,26 @@ export async function POST(request: Request) {
 
     const imageBuffer = await response.arrayBuffer();
 
-    const filename = `${crypto.randomUUID()}-${text.slice(0, 10)}.jpeg`;
+    if (imageUrl != "") {
+      // Update image
+      const filename = imageUrl.split("/").pop();
+      const newName = `${crypto.randomUUID()}-${text.slice(0, 10)}.jpeg`;
+      const publicUrl = await uploadImage(imageBuffer, filename, userID, newName);
+      console.log("Updating image in S3:", publicUrl);
+      return NextResponse.json({ success: true, id: filename, imageUrl: publicUrl });
+    } else {
+      const filename = `${crypto.randomUUID()}-${text.slice(0, 10)}.jpeg`;
 
-    const publicUrl = await uploadImage(imageBuffer, filename, userID);
+      const publicUrl = await uploadImage(imageBuffer, filename, userID);
 
-    console.log("Uploading image to S3:", publicUrl);
+      console.log("Uploading image to S3:", publicUrl);
 
-    return NextResponse.json({ success: true, id: filename, imageUrl: publicUrl });
-
+      return NextResponse.json({
+        success: true,
+        id: filename,
+        imageUrl: publicUrl,
+      });
+    }
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message },

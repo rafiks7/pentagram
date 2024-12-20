@@ -33,6 +33,7 @@ class Model:
     @modal.enter()
     def load_weights(self):
         from diffusers import AutoPipelineForText2Image
+        from diffusers.utils import make_image_grid, load_image
         import torch
 
         self.pipe = AutoPipelineForText2Image.from_pretrained(
@@ -44,7 +45,10 @@ class Model:
         self.API_KEY = os.environ["API_KEY"]
 
     @modal.web_endpoint()
-    def generate(self, request: Request, prompt: str = Query(..., description="The text prompt to generate the image from")):
+    def generate(self, 
+                    request: Request, 
+                    prompt: str = Query(..., description="The text prompt to generate the image from"),
+                    imageurl: str = Query(None, description="Optional URL of an image to be included")):
         
         api_key = request.headers.get("X-API-Key")
 
@@ -52,7 +56,10 @@ class Model:
             raise HTTPException(status_code=401, detail="Unauthorized")
         
         try:
-            image = self.pipe(prompt, num_inference_steps=1, guidance_scale=0.0).images[0]
+            if imageurl:
+                image = self.pipe(prompt, num_inference_steps=1, guidance_scale=0.0, image=load_image(imageurl), output_type="latent").images[0]
+            else:
+                image = self.pipe(prompt, num_inference_steps=1, guidance_scale=0.0).images[0]
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
         

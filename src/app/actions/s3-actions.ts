@@ -8,16 +8,24 @@ import {
 } from "@aws-sdk/client-s3";
 import { fromEnv } from "@aws-sdk/credential-provider-env";
 
-
 const client = new S3Client({
   region: process.env.AWS_REGION,
   credentials: fromEnv(),
 });
 
-export async function uploadImage(imageBuffer: ArrayBuffer, filename: string, userID: string) {
+export async function uploadImage(
+  imageBuffer: ArrayBuffer,
+  filename: string,
+  userID: string,
+  newFilename?: string
+) {
+  const newKey = newFilename
+    ? `${userID}/${newFilename}`
+    : `${userID}/${filename}`;
+
   const command = new PutObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME,
-    Key: `${userID}/${filename}`,
+    Key: newKey,
     Body: new Uint8Array(imageBuffer),
     ContentType: "image/jpeg",
   });
@@ -28,8 +36,17 @@ export async function uploadImage(imageBuffer: ArrayBuffer, filename: string, us
     console.error("Error while uploading image:", error);
   }
 
-  const publicUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${userID}/${filename}`;
-  return publicUrl;
+  if (newFilename && newFilename !== filename) {
+    const newPublicUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${userID}/${newFilename}`;
+    await deleteImage(
+      `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${userID}/${filename}`,
+      userID
+    );
+    return newPublicUrl;
+  } else {
+    const publicUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${userID}/${filename}`;
+    return publicUrl;
+  }
 }
 
 export async function listImages(userID: string) {
