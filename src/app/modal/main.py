@@ -24,7 +24,7 @@ app = modal.App("sdxl-turbo", image=image)
 @app.cls(
     image=image,
     gpu="A10G",
-    container_idle_timeout=300,
+    # container_idle_timeout=300,
     secrets=[modal.Secret.from_name("custom-secret")]
 )
 class Model:
@@ -73,22 +73,22 @@ class Model:
     def health(self):
         return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
     
-@app.function(
-    schedule=modal.Cron("*/5 * * * *"),
-    secrets=[modal.Secret.from_name("custom-secret")]
-)
-def keep_warm():
-    health_url = "https://rafikasaad007--sdxl-turbo-model-generate.modal.run"
-    generate_url = "hhttps://rafikasaad007--sdxl-turbo-model-health.modal.run"
+# @app.function(
+#     schedule=modal.Cron("*/5 * * * *"),
+#     secrets=[modal.Secret.from_name("custom-secret")]
+# )
+# def keep_warm():
+#     health_url = "https://rafikasaad007--sdxl-turbo-model-generate.modal.run"
+#     generate_url = "hhttps://rafikasaad007--sdxl-turbo-model-health.modal.run"
 
-    health_response = requests.get(health_url)
-    print('health_response', health_response.json())
-    print(f"Health check status code: {health_response.json()['status']} at: {datetime.now(timezone.utc).isoformat()}")
+#     health_response = requests.get(health_url)
+#     print('health_response', health_response.json())
+#     print(f"Health check status code: {health_response.json()['status']} at: {datetime.now(timezone.utc).isoformat()}")
 
-    headers = {
-        "X-API-Key": os.environ["API_KEY"]
-    }
+#     headers = {
+#         "X-API-Key": os.environ["API_KEY"]
+#     }
 
-    generate_response = requests.get(generate_url, headers=headers)
-    print(f"Generate endpoint tested successfully at: {datetime.now(timezone.utc).isoformat()}")
+#     generate_response = requests.get(generate_url, headers=headers)
+#     print(f"Generate endpoint tested successfully at: {datetime.now(timezone.utc).isoformat()}")
 

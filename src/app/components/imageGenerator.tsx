@@ -16,6 +16,16 @@ export default function ImageGenerator() {
 
   const { user } = useUser();
 
+  useEffect(() => {
+    // fetch images from s3
+    if (!user) return;
+    listImages(user.id).then(images => {
+      console.log("Images from s3:", images);
+      if (!images) return;
+      setImages(images);
+    });
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -67,7 +77,6 @@ export default function ImageGenerator() {
   const handleEdit = (index: any) => {
     setEditingIndex(index);
   };
-
   const handleSaveEdit = () => {
     // Logic to save the edit
     const imageUrl = images[editingIndex];
@@ -76,38 +85,35 @@ export default function ImageGenerator() {
     setIsEditing(true);
 
     if (user) {
-      generateImage(editText, user.id, imageUrl).then(result => {
-        if (result.success && result.imageUrl) {
-          console.log("Image updated successfully:", result.imageUrl);
-          const newImages = [...images];
-          newImages[editingIndex] = result.imageUrl;
-          console.log("New images:", newImages);
-          setImages(newImages);
-        } else {
-          alert("Failed to update image");
-        }
-      });
-    }
+      generateImage(editText, user.id, imageUrl)
+        .then(result => {
+          if (result.success && result.imageUrl) {
+            console.log("Image updated successfully:", result.imageUrl);
+            const newImages = [...images];
+            newImages[editingIndex] = result.imageUrl;
+            console.log("New images:", newImages);
+            setImages(newImages);
+          } else {
+            alert("Failed to update image");
+          }
 
-    setEditingIndex(-1);
-    setIsEditing(false);
-    setEditText("");
+          setEditingIndex(-1);
+          setIsEditing(false);
+          setEditText("");
+        })
+        .catch(err => {
+          console.error("Error updating image:", err);
+          setIsEditing(false);
+        });
+    } else {
+      setIsEditing(false);
+    }
   };
 
   const handleCancelEdit = () => {
     setEditingIndex(-1);
     setEditText("");
   };
-
-  useEffect(() => {
-    // fetch images from s3
-    if (!user) return;
-    listImages(user.id).then(images => {
-      console.log("Images from s3:", images);
-      if (!images) return;
-      setImages(images);
-    });
-  }, [user]);
 
   return (
     <div className="min-h-screen flex flex-col justify-between p-8 bg-gray-900 text-gray-100">
@@ -126,81 +132,89 @@ export default function ImageGenerator() {
               key={index}
               className={`${gridClasses[index % gridClasses.length]} bg-gray-800 rounded-lg overflow-hidden relative`}
             >
-              <img
-                src={image}
-                alt={`Generated image ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
-
-              {/* Edit Button */}
-              {user?.id === images[index].split("/")[3] && (
-                <button
-                  onClick={() => handleEdit(index)} // Your edit function goes here
-                  className="absolute top-2 left-2 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M16 4l4 4M4 16l4 4M4 4l16 16"
-                    />
-                  </svg>
-                </button>
-              )}
-              {/* Delete Button */}
-              {user?.id === images[index].split("/")[3] && (
-                <button
-                  onClick={() => handleDelete(index)}
-                  className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              )}
-              {/* Conditionally render the text input if editing */}
-              {editingIndex === index && (
-                <div className="absolute bottom-2 left-2 right-2 bg-gray-900 p-2 rounded-lg shadow-lg">
-                  <input
-                    type="text"
-                    value={editText}
-                    onChange={e => setEditText(e.target.value)}
-                    className="w-full p-2 rounded-lg bg-gray-800 text-gray-100"
-                    placeholder="Enter a description..."
+              {isEditing && editingIndex === index ? (
+                <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500"></div>
+              ) : (
+                <>
+                  <img
+                    src={image}
+                    alt={`Generated image ${index + 1}`}
+                    className="w-full h-full object-cover"
                   />
-                  <div className="flex gap-2 mt-2">
+
+                  {/* Edit Button */}
+                  {user?.id === images[index].split("/")[3] && (
                     <button
-                      onClick={handleSaveEdit}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      onClick={() => handleEdit(index)} // Your edit function goes here
+                      className="absolute top-2 left-2 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
                     >
-                      Save
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M16 4l4 4M4 16l4 4M4 4l16 16"
+                        />
+                      </svg>
                     </button>
+                  )}
+
+                  {/* Delete Button */}
+                  {user?.id === images[index].split("/")[3] && (
                     <button
-                      onClick={handleCancelEdit}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                      onClick={() => handleDelete(index)}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
                     >
-                      Cancel
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
                     </button>
-                  </div>
-                </div>
+                  )}
+
+                  {/* Conditionally render the text input if editing */}
+                  {editingIndex === index && (
+                    <div className="absolute bottom-2 left-2 right-2 bg-gray-900 p-2 rounded-lg shadow-lg">
+                      <input
+                        type="text"
+                        value={editText}
+                        onChange={e => setEditText(e.target.value)}
+                        className="w-full p-2 rounded-lg bg-gray-800 text-gray-100"
+                        placeholder="Enter a description..."
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={handleSaveEdit}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}
