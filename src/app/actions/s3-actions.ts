@@ -60,9 +60,10 @@ export async function listImages(userID: string) {
   }
 }
 
-export async function deleteImage(imageUrl: string) {
+export async function deleteImage(imageUrl: string, userID: string) {
   console.log("Deleting image:", imageUrl);
   const filename = imageUrl.split("/").pop();
+
   if (!filename) {
     console.error("Invalid image URL:", imageUrl);
     return;
@@ -71,7 +72,7 @@ export async function deleteImage(imageUrl: string) {
 
   const command = new DeleteObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME,
-    Key: filename,
+    Key: `${userID}/${filename}`,
   });
 
   try {
