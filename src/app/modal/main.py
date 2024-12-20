@@ -1,146 +1,87 @@
-# import modal
-# from fastapi import FastAPI
-# from pydantic import BaseModel
-# from fastapi.middleware.cors import CORSMiddleware
-# from io import BytesIO
-# from fastapi.responses import StreamingResponse
-# import os
-
-# app = modal.App("stable-diffusion")
-# web_app = FastAPI()
-
-# # Allow CORS from specific origins (e.g., your frontend server)
-# web_app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["http://localhost:3000"],  # Adjust this to the URL of your Next.js app
-#     allow_credentials=True,
-#     allow_methods=["*"],  
-#     allow_headers=["*"],  
-# )
-
-# class Prompt(BaseModel):
-#     text: str
-
-# @web_app.post("/generate")
-# def run_stable_diffusion(req: Prompt):
-#     from diffusers import StableDiffusion3Pipeline
-#     # from diffusers import BitsAndBytesConfig, SD3Transformer2DModel
-#     import torch
-    
-#     # diffuser model id
-#     model_id = "stabilityai/stable-diffusion-3.5-large"
-
-#     # # 4-bit quantization config
-#     # nf4_config = BitsAndBytesConfig(
-#     #     load_in_4bit=True,
-#     #     bnb_4bit_quant_type="nf4",
-#     #     bnb_4bit_compute_dtype=torch.bfloat16
-#     # )
-
-#     # # transofrmer model
-#     # model_nf4 = SD3Transformer2DModel.from_pretrained(
-#     #     model_id,
-#     #     subfolder="transformer",
-#     #     quantization_config=nf4_config,
-#     #     torch_dtype=torch.bfloat16
-#     # )
-
-#     # pipeline for diffusion model
-#     pipeline = StableDiffusion3Pipeline.from_pretrained(
-#         model_id,
-#         # transformer_model=model_nf4,
-#         torch_dtype=torch.bfloat16,
-#         use_auth_token=os.environ["HF_TOKEN"],
-#     ).to("cuda")
-
-#     # enable cpu offload
-#     # pipeline.enable_model_cpu_offload()
-
-#     # extract prompt from request
-#     prompt = req.text
-
-#     # generate image
-#     image = pipeline(prompt, num_inference_steps=28, guidance_scale=3.5).images[0]
-
-#     # convert image to bytes
-#     buf = BytesIO()
-#     image.save(buf, format="PNG")
-#     img_bytes = buf.getvalue()
-
-#     # return image as streaming response
-#     return StreamingResponse(BytesIO(img_bytes), media_type="image/png")
-
-# image = (
-#     modal.Image.debian_slim(python_version="3.12")
-#     .pip_install(
-#         "accelerate==0.33.0",
-#         "diffusers==0.31.0",
-#         "fastapi[standard]==0.115.4",
-#         "huggingface-hub[hf_transfer]==0.25.2",
-#         "sentencepiece==0.2.0",
-#         "torch==2.5.1",
-#         "torchvision==0.20.1",
-#         "transformers~=4.44.0",
-#     ))
-# with image.imports:
-
-# @app.function(
-#         image=image,
-#         secrets=[modal.Secret.from_name("huggingface-secret")],
-#         gpu="A10G")
-# @modal.asgi_app()
-# def fastapi_app():
-#     return web_app
-
-# # @app.local_entrypoint()
-# # def main():
-# #     img_bytes = run_stable_diffusion.remote("Wu-Tang Clan climbing Mount Everest")
-# #     with open("/tmp/output.png", "wb") as f:
-# #         f.write(img_bytes)
-# #     return img_bytes
-
-import numpy as np
-from fastapi import FastAPI
-from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
-from io import BytesIO
-from fastapi.responses import StreamingResponse
+import modal
+import io
+from fastapi import Response, HTTPException, Query, Request
+from datetime import datetime, timezone
+import requests
 import os
-from PIL import Image
-from dotenv import load_dotenv
-import random
 
-load_dotenv()
+def download_model():
+    from diffusers import AutoPipelineForText2Image
+    import torch
 
-app = FastAPI()
+    AutoPipelineForText2Image.from_pretrained(
+        "stabilityai/sdxl-turbo",
+        torch_dtype=torch.float16,
+        variant="fp16"
+    )
 
-# Allow CORS from specific origins (e.g., your frontend server)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Adjust this to the URL of your Next.js app
-    allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"],  
+image = (modal.Image.debian_slim()
+         .pip_install("fastapi[standard]", "transformers", "accelerate", "diffusers", "requests")
+         .run_function(download_model))
+
+app = modal.App("sdxl-turbo", image=image)
+
+@app.cls(
+    image=image,
+    gpu="A10G",
+    container_idle_timeout=300,
+    secrets=[modal.Secret.from_name("custom-secret")]
 )
+class Model:
 
-class Prompt(BaseModel):
-    text: str
+    @modal.build()
+    @modal.enter()
+    def load_weights(self):
+        from diffusers import AutoPipelineForText2Image
+        import torch
 
-@app.post("/test")
-def generate_random_image(req: Prompt):
-    colors = ["red", "green", "blue", "yellow", "purple", "orange"]
-    random_color = random.choice(colors)
-    img = Image.new("RGB", (100, 100), color=random_color)
- 
-    # Save the image to a BytesIO object
-    img_byte_arr = BytesIO()
-    img.save(img_byte_arr, format="PNG")
-    img_byte_arr.seek(0)
+        self.pipe = AutoPipelineForText2Image.from_pretrained(
+            "stabilityai/sdxl-turbo",
+            torch_dtype=torch.float16,
+            variant="fp16"
+        )
+        self.pipe.to("cuda")
+        self.API_KEY = os.environ["API_KEY"]
 
-    return StreamingResponse(img_byte_arr, media_type="image/png")
+    @modal.web_endpoint()
+    def generate(self, request: Request, prompt: str = Query(..., description="The text prompt to generate the image from")):
+        
+        api_key = request.headers.get("X-API-Key")
 
+        if api_key != self.API_KEY:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        try:
+            image = self.pipe(prompt, num_inference_steps=1, guidance_scale=0.0).images[0]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG")
 
-if __name__ == '__main__':
-    import uvicorn
-    print('token:', os.getenv("HF_TOKEN"))
-    uvicorn.run(app, host="127.0.0.1", port=10000)
+        return Response(content=buffer.getvalue(), media_type="image/jpeg")
+    
+
+    @modal.web_endpoint()
+    def health(self):
+        return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+    
+@app.function(
+    schedule=modal.Cron("*/5 * * * *"),
+    secrets=[modal.Secret.from_name("custom-secret")]
+)
+def keep_warm():
+    health_url = "https://rafikasaad007--sdxl-turbo-model-generate.modal.run"
+    generate_url = "hhttps://rafikasaad007--sdxl-turbo-model-health.modal.run"
+
+    health_response = requests.get(health_url)
+    print('health_response', health_response.json())
+    print(f"Health check status code: {health_response.json()['status']} at: {datetime.now(timezone.utc).isoformat()}")
+
+    headers = {
+        "X-API-Key": os.environ["API_KEY"]
+    }
+
+    generate_response = requests.get(generate_url, headers=headers)
+    print(f"Generate endpoint tested successfully at: {datetime.now(timezone.utc).isoformat()}")
+
