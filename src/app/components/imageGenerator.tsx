@@ -119,7 +119,7 @@ export default function ImageGenerator() {
     <div className="min-h-screen flex flex-col justify-between p-8 bg-gray-900 text-gray-100">
       <header className="w-full max-w-5xl mx-auto mb-8">
         <h1 className="text-4xl font-bold text-center text-blue-400 mb-2">
-          Pentagram
+          Frame Forger
         </h1>
         <p className="text-center text-gray-400">
           Generate and share images from text

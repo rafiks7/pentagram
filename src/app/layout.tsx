@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pentagram",
+  title: "Frame Forger",
   description: "Generate and share images from text",
 };
 
